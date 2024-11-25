@@ -55,9 +55,10 @@
  (bind ?pitch (ros-msgs-get-field ?inc-msg "theta"))
  (bind ?dx (- ?tx ?x))
  (bind ?dy (- ?ty ?y))
+ (bind ?distance (sqrt (+ (** ?dx 2) (** ?dy 2))))
  (bind ?tpitch (NormalizeAngle (atan2 ?dy ?dx)))
  (bind ?dpitch (NormalizeAngle (- ?tpitch ?pitch)))
- (bind ?vel (min 1.2 (sqrt (+ (** ?dx 2) (** ?dy 2)))))
+ (bind ?vel (max 0.4 (min 1.2 ?distance)))
  ; (printout blue "Turtle rot " ?dpitch " tpitch " ?tpitch " pitch " ?pitch crlf)
  ; (printout red "fact" ?tx " target y" ?ty " order " ?order   crlf)
  ; (printout blue "delta " ?dx " y " ?dy crlf)
@@ -70,9 +71,40 @@
  (ros-msgs-set-field ?cmd "angular" ?ang)
  (ros-msgs-publish ?cmd "/turtle1/cmd_vel")
  (ros-msgs-destroy-message ?inc-msg)
- (if (< ?vel 0.1)
+ (ros-msgs-destroy-message ?lin)
+ (ros-msgs-destroy-message ?ang)
+ (ros-msgs-destroy-message ?cmd)
+ (if (< ?distance 0.1)
     then
     (retract ?pos-f)
  )
  (retract ?msg-f)
+)
+
+(defrule ros-msgs-sub-finalize
+" Delete the subscription on executive finalize. "
+  (executive-finalize)
+  (ros-msgs-subscription (topic ?topic))
+=>
+  (printout debug "Destroying topic " ?topic crlf)
+  (ros-msgs-destroy-subscription ?topic)
+)
+
+(defrule ros-msgs-pub-finalize
+" Delete the publisher on executive finalize. "
+  (executive-finalize)
+  (ros-msgs-publisher (topic ?topic))
+=>
+  (printout info "Destroying topic " ?topic crlf)
+  (ros-msgs-destroy-publisher ?topic)
+)
+
+
+(defrule ros-msgs-message-cleanup
+" Delete the subscription on executive finalize. "
+  (executive-finalize)
+  ?msg-f <- (ros-msgs-message (msg-ptr ?ptr))
+=>
+  (ros-msgs-destroy-message ?ptr)
+  (retract ?msg-f)
 )
